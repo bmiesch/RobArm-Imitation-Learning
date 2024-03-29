@@ -3,7 +3,7 @@ import threading
 from time import sleep
 import rospy
 from pick_and_place import PickAndPlace
-from data_collection_new import DataCollection
+from data_collection import DataCollection
 
 exit_flag = False
 
@@ -15,7 +15,7 @@ def game_loop(game, color_hsv, data_collection):
     capture = cv.VideoCapture(0)
     task_iteration = 0
     
-    while capture.isOpened() and not exit_flag:
+    while capture.isOpened() and not exit_flag and not rospy.is_shutdown():
         _, img = capture.read()
         img = cv.resize(img, (640, 480))
 
@@ -38,6 +38,7 @@ def game_loop(game, color_hsv, data_collection):
                 # Reset
                 joints = None
                 block_position = None
+                sleep(3)
         else:
             rospy.loginfo("No block detected")
         
@@ -62,23 +63,23 @@ def main():
     color_hsv = [(0, 100, 100), (10, 255, 255)]
 
     # Initialize DataCollection
-    data_collection = DataCollection(1, "images", "control_signals.csv")
+    data_collection = DataCollection(camera_index=1)
     data_collection.calibrate_camera()
-    data_capture_frequency = 10  # Capture data 10 times per iteration
-    data_collection.start_data_collection(game, data_capture_frequency)
+    data_capture_frequency = 10
     
     game_thread = threading.Thread(target=game_loop, args=(game, color_hsv, data_collection))
     game_thread.start()
     
     try:
-        while game_thread.is_alive():
-            game_thread.join()
+        game_thread.join()
     except KeyboardInterrupt:
         global exit_flag
         exit_flag = True
         print("Interrupted by user")
+        game_thread.join()
     finally:
-        data_collection.stop_data_collection()
+        data_collection.stop_task_data_collection(-1)
+        print("Data collection stopped in finally")
 
 if __name__ == '__main__':
     main()

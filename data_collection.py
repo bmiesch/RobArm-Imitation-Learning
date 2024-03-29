@@ -5,40 +5,54 @@ import json
 import time
 import threading
 from control import RoboticArm
+import rospy
 
 
 class DataCollection:
-    def __init__(self, camera_index, image_path, signal_path, crop_params=None):
+    def __init__(self, camera_index, image_path="data/images", signal_path="data/", crop_params=None):
         self.camera = cv2.VideoCapture(camera_index)
         self.image_path = image_path
         self.signal_path = signal_path
         self.crop_params = crop_params
         self.data_buffer = []
         self.robotic_arm = RoboticArm()
+        self.running = False
 
     def save_task_data(self, task_iteration):
         """
-        Saves the images and joint angles (collected_data) for an iteration to the specified path.
+        Saves the images and joint angles (data_buffer) for an iteration to the specified path.
+        Pretty-prints each data entry on a new line for better readability.
         """
         timestamp = int(time.time() * 1000)
         task_folder = f"{self.image_path}/task_{task_iteration}"
         os.makedirs(task_folder, exist_ok=True)
 
-        data = []
-        for i, (image, joints) in enumerate(self.collected_data):
+        # Prepare the data for the current iteration
+        current_iteration_data = []
+        for i, (image, joints) in enumerate(self.data_buffer):
             image_filename = f"{task_folder}/image_{timestamp}_{i}.png"
             cv2.imwrite(image_filename, image)
-            data.append({
-                "iteration": task_iteration,
+            current_iteration_data.append({
                 "timestamp": timestamp,
                 "image_index": i,
                 "image_filename": image_filename,
                 "joint_angles": joints
             })
 
-        with open(f"{self.signal_path}/joint_angles.json", 'a') as f:
-            json.dump(data, f)
-            f.write('\n')
+        # Load existing data or initialize if starting fresh
+        json_file_path = f"{self.signal_path}/joint_angles.json"
+        if os.path.exists(json_file_path):
+            with open(json_file_path, 'r') as f:
+                data = json.load(f)
+        else:
+            data = {"data": {}}
+
+        # Append the current iteration's data
+        data["data"][f"iteration_{task_iteration}"] = current_iteration_data
+
+        # Write the updated data back to the file
+        with open(json_file_path, 'w') as f:
+            json.dump(data, f, indent=4)
 
         self.data_buffer = []
 
@@ -46,7 +60,8 @@ class DataCollection:
         """
         Collects images and joint angles from the robotic arm and stores them in the data_buffer.
         """
-        while True:
+        self.running = True
+        while self.running:
             img = self.capture_image()
             joints_angles = self.robotic_arm.read_joint_angles()
             self.data_buffer.append((img.copy(), joints_angles))
@@ -56,15 +71,21 @@ class DataCollection:
         """
         Starts the task data collection thread.
         """
+        rospy.loginfo("Starting task data collection")
         self.task_data_collection_thread_instance = threading.Thread(target=self.task_data_collection_thread)
+        self.task_data_collection_thread_instance.daemon = True
         self.task_data_collection_thread_instance.start()
 
     def stop_task_data_collection(self, task_iteration):
         """
         Stops the task data collection thread and saves the data for the specified task iteration.
         """
-        self.task_data_collection_thread_instance.join()
-        self.save_task_data(task_iteration)
+        rospy.loginfo("Stopping task data collection")
+        self.running = False
+        if self.task_data_collection_thread_instance:
+            self.task_data_collection_thread_instance.join()
+        if task_iteration != -1:
+            self.save_task_data(task_iteration)
 
     def capture_image(self):
         """

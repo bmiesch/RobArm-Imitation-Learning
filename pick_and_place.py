@@ -5,7 +5,7 @@ import numpy as np
 from time import sleep
 from dofbot_info.srv import kinemarics, kinemaricsRequest, kinemaricsResponse
 from control import RoboticArm
-from dofbot_config import Arm_Calibration
+from external.dofbot_config import Arm_Calibration
 
 class PickAndPlace:
     def __init__(self):
@@ -42,8 +42,8 @@ class PickAndPlace:
 
 
     def get_block_position(self, image, color_hsv):
-        self.image = cv.resize(image, (640, 480))
-        HSV_img = cv.cvtColor(self.image, cv.COLOR_BGR2HSV)
+        # resize_image = cv.resize(image, (640, 480))
+        HSV_img = cv.cvtColor(image, cv.COLOR_BGR2HSV)
         img = cv.inRange(HSV_img, color_hsv[0], color_hsv[1])
         contours, _ = cv.findContours(img, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
         
@@ -51,7 +51,7 @@ class PickAndPlace:
             area = cv.contourArea(cnt)
             if area > 1000:
                 x, y, w, h = cv.boundingRect(cnt)
-                cv.rectangle(self.image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
                 point_x = float(x + w / 2)
                 point_y = float(y + h / 2)
                 return (round(((point_x - 320) / 4000), 5), round(((480 - point_y) / 3000) * 0.8+0.19, 5))
@@ -92,13 +92,6 @@ class PickAndPlace:
         rospy.loginfo("Moved over blocks position")
         sleep(1)
 
-        # Opening and closing jaws
-        for i in range(2):
-            self.robotic_arm.move_single_servo(6, 180, 100)
-            sleep(0.08)
-            self.robotic_arm.move_single_servo(6, 30, 100)
-            sleep(0.08)
-
         # Move to block position
         self.robotic_arm.move_servos(block_joints, 500)
         rospy.loginfo("Moved to block position")
@@ -133,7 +126,7 @@ class PickAndPlace:
         # Lift up
         self.robotic_arm.move_servos(joints_up, 1000)
         rospy.loginfo("Lifted up")
+        sleep(1)
         
         # Reset
-        sleep(3)
         self.robotic_arm.set_home_position()
