@@ -59,8 +59,8 @@ def shutdown_hook():
 def main():
     game = PickAndPlace()
     
-    # Red block
-    color_hsv = [(0, 100, 100), (10, 255, 255)]
+    # Green block
+    color_hsv = [(35, 43, 46), (77, 255, 255)]
 
     # Initialize DataCollection
     data_collection = DataCollection(camera_index=1)

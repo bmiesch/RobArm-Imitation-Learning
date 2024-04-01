@@ -103,18 +103,12 @@ class PickAndPlace:
         sleep(0.5)
 
         # Lift up
-        self.robotic_arm.move_servos(joints_uu, 1000)
+        self.robotic_arm.move_single_servo(2, 70, 1500)
         rospy.loginfo("Lifted up")
         sleep(1)
 
-        # Lift to above the corresponding position
-        self.robotic_arm.move_single_servo(1, block_joints[0], 500)
-        sleep(0.5)
-
-        # Move to drop location
-        drop_location = [block_joints[0], block_joints[1], block_joints[2],
-                        block_joints[3], block_joints[4], 135]
-        self.robotic_arm.move_servos(drop_location, 1000)
+        # Put down
+        self.robotic_arm.move_single_servo(2, block_joints[1], 1500)
         rospy.loginfo("Moved to target location")
         sleep(1)
 
