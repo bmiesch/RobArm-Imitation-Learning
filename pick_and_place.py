@@ -42,7 +42,6 @@ class PickAndPlace:
 
 
     def get_block_position(self, image, color_hsv):
-        # resize_image = cv.resize(image, (640, 480))
         HSV_img = cv.cvtColor(image, cv.COLOR_BGR2HSV)
         img = cv.inRange(HSV_img, color_hsv[0], color_hsv[1])
         contours, _ = cv.findContours(img, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)

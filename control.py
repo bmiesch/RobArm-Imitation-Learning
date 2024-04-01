@@ -46,13 +46,12 @@ class RoboticArm:
         self.move_servos(home_positions, duration_ms)
         print("Robot has been set to its home position.")
 
-    def set_custom_position(self, positions):
+    def set_custom_position(self, positions, duration_ms=500):
         """
         Sets the robotic arm to a custom position.
 
         :param positions: List of servo positions to set the arm to.
         """
-        duration_ms = 500  # This could also be made dynamic if needed
         self.move_servos(positions, duration_ms)
         time.sleep(duration_ms / 1000.0)
         print("Robot has been set to a custom position.")
