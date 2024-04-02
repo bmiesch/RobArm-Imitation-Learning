@@ -80,7 +80,7 @@ class PickAndPlace:
         except Exception:
             rospy.loginfo("arg error")
 
-    def move_block(self, joints):
+    def move_block(self, joints, data_collection=None, cur_iteration=None):
         rospy.loginfo(f"Target Location: {joints}")
         block_joints = [joints[0], joints[1], joints[2], joints[3], 265, 30]
         joints_uu = [90, 80, 50, 50, 265, 135]
@@ -89,6 +89,8 @@ class PickAndPlace:
         # Move over the block's position
         self.robotic_arm.move_servos(joints_uu, 1000)
         rospy.loginfo("Moved over blocks position")
+        if data_collection is not None:
+            data_collection.start_task_data_collection()
         sleep(1)
 
         # Move to block position
@@ -116,9 +118,11 @@ class PickAndPlace:
         rospy.loginfo("Released the block")
         sleep(0.5)
 
-        # Lift up
-        self.robotic_arm.move_servos(joints_up, 1000)
-        rospy.loginfo("Lifted up")
+        # Back to over block's position
+        self.robotic_arm.move_servos(joints_uu, 1000)
+        rospy.loginfo("Back to over block's position")
+        if data_collection is not None:
+            data_collection.stop_task_data_collection(cur_iteration)
         sleep(1)
         
         # Reset

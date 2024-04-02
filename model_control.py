@@ -109,7 +109,7 @@ class RobotController:
             print(joint_angles)
             
             # Manual confirmation
-            # input("Press Enter to move to the next position, or Ctrl+C to exit...")
+            input("Press Enter to move to the next position, or Ctrl+C to exit...")
             
             self.robotic_arm.set_custom_position(joint_angles)
 
