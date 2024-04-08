@@ -30,9 +30,8 @@ def game_loop(game, color_hsv, data_collection):
             joints = game.calculate_inverse_kinematics(block_position)
             
             if joints is not None:
-                # data_collection.start_task_data_collection()
-                game.move_block(joints, data_collection, task_iteration)
-                # data_collection.stop_task_data_collection(task_iteration)
+                # game.move_block(joints, data_collection, task_iteration)
+                game.move_block(joints)
                 task_iteration += 1
 
                 # Reset
@@ -65,7 +64,6 @@ def main():
     # Initialize DataCollection
     data_collection = DataCollection(camera_index=1)
     data_collection.calibrate_camera()
-    data_capture_frequency = 10
     
     game_thread = threading.Thread(target=game_loop, args=(game, color_hsv, data_collection))
     game_thread.start()

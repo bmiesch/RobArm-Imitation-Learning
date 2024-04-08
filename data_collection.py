@@ -65,7 +65,7 @@ class DataCollection:
             img = self.capture_image()
             joints_angles = self.robotic_arm.read_joint_angles()
             self.data_buffer.append((img.copy(), joints_angles))
-            time.sleep(0.1)
+            time.sleep(0.5)
 
     def start_task_data_collection(self):
         """

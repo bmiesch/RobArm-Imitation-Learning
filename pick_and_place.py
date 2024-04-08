@@ -31,12 +31,6 @@ class PickAndPlace:
 
         self.dp, img = self.calibration.calibration_map(img, cur_angles, threshold)
 
-        # Save the joint angles and threshold value to a file
-        # try:
-        #     write_XYT(XYT_path, joint_angles, threshold_value)
-        # except Exception:
-        #     print("Failed to write XYT_config")
-
         # Close the camera
         capture.release()
 
@@ -86,6 +80,9 @@ class PickAndPlace:
         joints_uu = [90, 80, 50, 50, 265, 135]
         joints_up = [joints[0], 80, 50, 50, 265, 30]
 
+        # This is the yellow block on the map
+        bowl_joints = [65, 40, 64, 56, 265, 135]
+
         # Move over the block's position
         self.robotic_arm.move_servos(joints_uu, 1000)
         rospy.loginfo("Moved over blocks position")
@@ -109,8 +106,13 @@ class PickAndPlace:
         sleep(1)
 
         # Put down
-        self.robotic_arm.move_single_servo(2, block_joints[1], 1500)
-        rospy.loginfo("Moved to target location")
+        # self.robotic_arm.move_single_servo(2, block_joints[1], 1500)
+        # rospy.loginfo("Moved to target location")
+        # sleep(1)
+
+        # Move to bowl
+        self.robotic_arm.move_servos(bowl_joints, 1000)
+        rospy.loginfo("Moved to bowl")
         sleep(1)
 
         # Release the block

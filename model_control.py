@@ -1,17 +1,17 @@
 import cv2 as cv
 import torch
 import numpy as np
-from train.model import ResNet18ForRobotArm 
+from train.model import SingleCameraCNNMLP 
 from control import RoboticArm
 from torchvision import transforms
 from PIL import Image
 
 class RobotController:
-    def __init__(self, camera_index, model_path):
+    def __init__(self, camera_index, checkpoint_path):
         self.robotic_arm = RoboticArm()
         self.camera = cv.VideoCapture(camera_index)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = self.load_model(model_path).to(self.device)
+        self.model = self.load_model(checkpoint_path).to(self.device)
         self.transform = transforms.Compose([
             transforms.Resize(256),
             transforms.CenterCrop(224),
@@ -19,9 +19,11 @@ class RobotController:
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
 
-    def load_model(self, model_path):
-        model = ResNet18ForRobotArm(num_output=6)  # Adjust this based on your model
-        model.load_state_dict(torch.load(model_path, map_location=self.device))
+    def load_model(self, checkpoint_path):
+        model = SingleCameraCNNMLP(state_dim=6)
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        # model.load_state_dict(torch.load(checkpoint_path, map_location=self.device))
         model.eval()
         return model
     
@@ -90,22 +92,31 @@ class RobotController:
     def preprocess_image(self, image):
         image = cv.cvtColor(image, cv.COLOR_BGR2RGB)
         image = Image.fromarray(image)
-        image = self.transform(image).unsqueeze(0).to(self.device)  # Add batch dimension and move to GPU
+        image = self.transform(image).unsqueeze(0).to(self.device)
         return image
 
-    def predict_joint_angles(self, image):
+    def predict_joint_angles(self, image, qpos):
         with torch.no_grad():
             image = self.preprocess_image(image)
-            predictions = self.model(image)
-            joint_angles = predictions.squeeze().cpu().tolist()  # Move data to CPU before converting to Python list
+            qpos = torch.tensor(qpos).unsqueeze(0).to(self.device)
+            predictions = self.model(image, qpos)
+            joint_angles = predictions.squeeze().cpu().tolist()
         return joint_angles
 
     def control_loop(self):
+        # Set to above block position
+        self.robotic_arm.set_custom_position([90, 80, 50, 50, 265, 135])
+
         while True:
             image = self.capture_image()
             if image is None:
                 continue
-            joint_angles = self.predict_joint_angles(image)
+            qpos = self.robotic_arm.read_joint_angles()
+            while any(joint is None for joint in qpos):
+                time.sleep(0.1)
+                qpos = self.robotic_arm.read_joint_angles()
+
+            joint_angles = self.predict_joint_angles(image, qpos)
             print(joint_angles)
             
             # Manual confirmation
@@ -114,6 +125,6 @@ class RobotController:
             self.robotic_arm.set_custom_position(joint_angles)
 
 if __name__ == "__main__":
-    controller = RobotController(camera_index=1, model_path='train/cnn_arm_controller.pth')
+    controller = RobotController(camera_index=1, checkpoint_path='train/model_checkpoint.pth')
     controller.calibrate_camera()
     controller.control_loop()
