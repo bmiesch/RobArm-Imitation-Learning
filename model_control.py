@@ -5,6 +5,7 @@ from train.model import SingleCameraCNNMLP
 from control import RoboticArm
 from torchvision import transforms
 from PIL import Image
+import time
 
 class RobotController:
     def __init__(self, camera_index, checkpoint_path):
@@ -123,6 +124,7 @@ class RobotController:
             input("Press Enter to move to the next position, or Ctrl+C to exit...")
             
             self.robotic_arm.set_custom_position(joint_angles)
+            time.sleep(0.2)
 
 if __name__ == "__main__":
     controller = RobotController(camera_index=1, checkpoint_path='train/model_checkpoint.pth')

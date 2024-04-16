@@ -30,8 +30,8 @@ def game_loop(game, color_hsv, data_collection):
             joints = game.calculate_inverse_kinematics(block_position)
             
             if joints is not None:
-                # game.move_block(joints, data_collection, task_iteration)
-                game.move_block(joints)
+                game.move_block(joints, data_collection, task_iteration)
+                # game.move_block(joints)
                 task_iteration += 1
 
                 # Reset

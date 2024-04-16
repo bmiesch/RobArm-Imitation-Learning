@@ -76,22 +76,23 @@ class PickAndPlace:
 
     def move_block(self, joints, data_collection=None, cur_iteration=None):
         rospy.loginfo(f"Target Location: {joints}")
-        block_joints = [joints[0], joints[1], joints[2], joints[3], 265, 30]
+        j0_bias = 4
+        block_joints = [joints[0]-j0_bias, joints[1], joints[2], joints[3], 265, 30]
         joints_uu = [90, 80, 50, 50, 265, 135]
         joints_up = [joints[0], 80, 50, 50, 265, 30]
 
-        # This is the yellow block on the map
-        bowl_joints = [65, 40, 64, 56, 265, 135]
+        # This is the yellow block on the map5
+        bowl_joints = [45, 40, 64, 56, 265, 135]
 
         # Move over the block's position
         self.robotic_arm.move_servos(joints_uu, 1000)
         rospy.loginfo("Moved over blocks position")
+        sleep(1)
         if data_collection is not None:
             data_collection.start_task_data_collection()
-        sleep(1)
 
         # Move to block position
-        self.robotic_arm.move_servos(block_joints, 500)
+        self.robotic_arm.move_servos(block_joints, 1500)
         rospy.loginfo("Moved to block position")
         sleep(0.5)
 
@@ -111,9 +112,9 @@ class PickAndPlace:
         # sleep(1)
 
         # Move to bowl
-        self.robotic_arm.move_servos(bowl_joints, 1000)
+        self.robotic_arm.move_servos(bowl_joints, 1500)
         rospy.loginfo("Moved to bowl")
-        sleep(1)
+        sleep(0.1)
 
         # Release the block
         self.robotic_arm.move_single_servo(6, 30, 500)
@@ -123,6 +124,7 @@ class PickAndPlace:
         # Back to over block's position
         self.robotic_arm.move_servos(joints_uu, 1000)
         rospy.loginfo("Back to over block's position")
+        sleep(0.5)
         if data_collection is not None:
             data_collection.stop_task_data_collection(cur_iteration)
         sleep(1)

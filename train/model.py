@@ -23,7 +23,7 @@ class SingleCameraCNNMLP(nn.Module):
         )
         
         # Define the MLP for predicting the joint angles
-        self.mlp = self._create_mlp(32 + state_dim, 1024, state_dim, hidden_depth=2)
+        self.mlp = self._create_mlp(32 + state_dim, 128, state_dim, hidden_depth=2)
 
     def _create_backbone_model(self, name, pretrained=True, return_interm_layers=False):
         backbone = getattr(models, name)(pretrained=pretrained)

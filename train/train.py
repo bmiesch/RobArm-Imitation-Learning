@@ -11,7 +11,9 @@ from model import SingleCameraCNNMLP
 import matplotlib.pyplot as plt
 import json
 
-
+SIDE_DATASET_PATH = "../data/bowl_data/side"
+FRONT_DATASET_PATH = "../data/bowl_data/front"
+DIAGONAL_DATASET_PATH = "../data/bowl_data/diagonal"
 DATASET_PATH = "../data"
 IMAGES_FOLDER = "images"
 LABELS_FILE = "joint_angles.json"
