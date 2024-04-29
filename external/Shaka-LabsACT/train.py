@@ -22,6 +22,7 @@ checkpoint_dir = os.path.join(train_cfg['checkpoint_dir'], task)
 
 # device
 device = os.environ['DEVICE']
+print(device)
 
 
 def forward_pass(data, policy):
@@ -76,16 +77,21 @@ def train_bc(train_dataloader, val_dataloader, policy_config):
             epoch_val_loss = epoch_summary['loss']
             if epoch_val_loss < min_val_loss:
                 min_val_loss = epoch_val_loss
-                best_ckpt_info = (epoch, min_val_loss, deepcopy(policy.state_dict()))
+                # best_ckpt_info = (epoch, min_val_loss, deepcopy(policy.state_dict()))
         print(f'Val loss:   {epoch_val_loss:.5f}')
         summary_string = ''
         for k, v in epoch_summary.items():
             summary_string += f'{k}: {v.item():.3f} '
         print(summary_string)
 
+        # Explicit memory management
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         # training
         policy.train()
         optimizer.zero_grad()
+        print("Starting training...")
         for batch_idx, data in enumerate(train_dataloader):
             forward_dict = forward_pass(data, policy)
             # backward
@@ -103,8 +109,8 @@ def train_bc(train_dataloader, val_dataloader, policy_config):
         print(summary_string)
 
         if epoch % 200 == 0:
-            ckpt_path = os.path.join(checkpoint_dir, f"policy_epoch_{epoch}_seed_{train_cfg['seed']}.ckpt")
-            torch.save(policy.state_dict(), ckpt_path)
+            # ckpt_path = os.path.join(checkpoint_dir, f"policy_epoch_{epoch}_seed_{train_cfg['seed']}.ckpt")
+            # torch.save(policy.state_dict(), ckpt_path)
             plot_history(train_history, validation_history, epoch, checkpoint_dir, train_cfg['seed'])
 
     ckpt_path = os.path.join(checkpoint_dir, f'policy_last.ckpt')
@@ -123,6 +129,11 @@ if __name__ == '__main__':
     # load data
     train_dataloader, val_dataloader, stats, _ = load_data(data_dir, num_episodes, task_cfg['camera_names'],
                                                             train_cfg['batch_size_train'], train_cfg['batch_size_val'])
+
+    # After loading data
+    sample_train_data = next(iter(train_dataloader))
+    sample_val_data = next(iter(val_dataloader))
+
     # save stats
     stats_path = os.path.join(checkpoint_dir, f'dataset_stats.pkl')
     with open(stats_path, 'wb') as f:

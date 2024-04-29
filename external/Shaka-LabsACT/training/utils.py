@@ -5,7 +5,7 @@ import numpy as np
 from einops import rearrange
 from torch.utils.data import DataLoader
 
-# from training.policy import ACTPolicy, CNNMLPPolicy
+from training.policy import ACTPolicy, CNNMLPPolicy
 
 
 import IPython
@@ -50,6 +50,14 @@ class EpisodicDataset(torch.utils.data.Dataset):
             else:
                 action = root['/action'][max(0, start_ts - 1):] # hack, to make timesteps more aligned
                 action_len = episode_len - max(0, start_ts - 1) # hack, to make timesteps more aligned
+        
+        # Print each piece of data with labels
+        # print(f"Episode ID: {episode_id}, Timestamp: {start_ts}")
+        # print("QPos Data:", qpos)
+        # print("Action Data:", action)
+        # for cam_name, img in image_dict.items():
+        #     print(f"Image Data from Camera {cam_name}:", img)
+        # Before normalization
 
         self.is_sim = is_sim
         padded_action = np.zeros(original_action_shape, dtype=np.float32)
@@ -77,6 +85,13 @@ class EpisodicDataset(torch.utils.data.Dataset):
         action_data = (action_data - self.norm_stats["action_mean"]) / self.norm_stats["action_std"]
         qpos_data = (qpos_data - self.norm_stats["qpos_mean"]) / self.norm_stats["qpos_std"]
 
+        # print("Raw Action Data:", action)
+        # print("Normalized Action Data:", action_data)
+
+        # print("Raw qpos Data:", qpos)
+        # print("Normalized Qpos Data: ", qpos_data)
+
+
         return image_data, qpos_data, action_data, is_pad
 
 
@@ -95,6 +110,9 @@ def get_norm_stats(dataset_dir, num_episodes):
     all_action_data = torch.stack(all_action_data)
     all_action_data = all_action_data
 
+    # print("Action Data len:", all_action_data.shape)
+    # print("QPos Data len:", all_qpos_data.shape)
+
     # normalize action data
     action_mean = all_action_data.mean(dim=[0, 1], keepdim=True)
     action_std = all_action_data.std(dim=[0, 1], keepdim=True)
@@ -108,6 +126,11 @@ def get_norm_stats(dataset_dir, num_episodes):
     stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
              "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
              "example_qpos": qpos}
+
+    # print("Action Mean before clipping:", action_mean)
+    # print("Action Std before clipping:", action_std)
+    # print("QPos Mean before clipping:", qpos_mean)
+    # print("QPos Std before clipping:", qpos_std)
 
     return stats
 

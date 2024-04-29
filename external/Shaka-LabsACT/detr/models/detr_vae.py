@@ -55,19 +55,19 @@ class DETRVAE(nn.Module):
         if backbones is not None:
             self.input_proj = nn.Conv2d(backbones[0].num_channels, hidden_dim, kernel_size=1)
             self.backbones = nn.ModuleList(backbones)
-            self.input_proj_robot_state = nn.Linear(5, hidden_dim)
+            self.input_proj_robot_state = nn.Linear(6, hidden_dim) # 5 -> 6
         else:
             # input_dim = 14 + 7 # robot_state + env_state
-            self.input_proj_robot_state = nn.Linear(5, hidden_dim)
-            self.input_proj_env_state = nn.Linear(5, hidden_dim)
+            self.input_proj_robot_state = nn.Linear(6, hidden_dim) # 5 -> 6
+            self.input_proj_env_state = nn.Linear(6, hidden_dim) # 5 -> 6
             self.pos = torch.nn.Embedding(2, hidden_dim)
             self.backbones = None
 
         # encoder extra parameters
         self.latent_dim = 32 # final size of latent z # TODO tune
         self.cls_embed = nn.Embedding(1, hidden_dim) # extra cls token embedding
-        self.encoder_action_proj = nn.Linear(5, hidden_dim) # project action to embedding
-        self.encoder_joint_proj = nn.Linear(5, hidden_dim)  # project qpos to embedding
+        self.encoder_action_proj = nn.Linear(6, hidden_dim) # project action to embedding (5 -> 6)
+        self.encoder_joint_proj = nn.Linear(6, hidden_dim)  # project qpos to embedding (5 -> 6)
         self.latent_proj = nn.Linear(hidden_dim, self.latent_dim*2) # project hidden state to latent std, var
         self.register_buffer('pos_table', get_sinusoid_encoding_table(1+1+num_queries, hidden_dim)) # [CLS], qpos, a_seq
 
@@ -84,6 +84,8 @@ class DETRVAE(nn.Module):
         """
         is_training = actions is not None # train or val
         bs, _ = qpos.shape
+        # print("qpos shape:", qpos.shape)
+        # print("actions shape:", actions.shape)
         ### Obtain latent z from action sequence
         if is_training:
             # project action sequence to embedding dim, and concat with a CLS token
@@ -94,12 +96,14 @@ class DETRVAE(nn.Module):
             cls_embed = torch.unsqueeze(cls_embed, axis=0).repeat(bs, 1, 1) # (bs, 1, hidden_dim)
             encoder_input = torch.cat([cls_embed, qpos_embed, action_embed], axis=1) # (bs, seq+1, hidden_dim)
             encoder_input = encoder_input.permute(1, 0, 2) # (seq+1, bs, hidden_dim)
+            # print("encoder input shape:", encoder_input.shape)
             # do not mask cls token
             cls_joint_is_pad = torch.full((bs, 2), False).to(qpos.device) # False: not a padding
             is_pad = torch.cat([cls_joint_is_pad, is_pad], axis=1)  # (bs, seq+1)
             # obtain position embedding
             pos_embed = self.pos_table.clone().detach()
             pos_embed = pos_embed.permute(1, 0, 2)  # (seq+1, 1, hidden_dim)
+            # print("pos embed shape:", pos_embed.shape)
             # query model
             encoder_output = self.encoder(encoder_input, pos=pos_embed, src_key_padding_mask=is_pad)
             encoder_output = encoder_output[0] # take cls output only
@@ -166,8 +170,8 @@ class CNNMLP(nn.Module):
                 backbone_down_projs.append(down_proj)
             self.backbone_down_projs = nn.ModuleList(backbone_down_projs)
 
-            mlp_in_dim = 768 * len(backbones) + 5
-            self.mlp = mlp(input_dim=mlp_in_dim, hidden_dim=1024, output_dim=5, hidden_depth=2)
+            mlp_in_dim = 768 * len(backbones) + 5 # 5 -> 6
+            self.mlp = mlp(input_dim=mlp_in_dim, hidden_dim=1024, output_dim=6, hidden_depth=2) # 5 -> 6
         else:
             raise NotImplementedError
 
@@ -227,7 +231,7 @@ def build_encoder(args):
 
 
 def build(args):
-    state_dim = 5 # TODO hardcode
+    state_dim = 6 # TODO hardcode
 
     # From state
     # backbone = None # from state for now, no need for conv nets
@@ -255,7 +259,7 @@ def build(args):
     return model
 
 def build_cnnmlp(args):
-    state_dim = 5 # TODO hardcode
+    state_dim = 6 # TODO hardcode
 
     # From state
     # backbone = None # from state for now, no need for conv nets

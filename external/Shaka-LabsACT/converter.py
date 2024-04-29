@@ -6,11 +6,33 @@ from PIL import Image
 import torch
 from training.utils import get_norm_stats
 
+print(torch.__version__)
+print(torch.cuda.is_available())
+
 
 def load_image(image_path):
     """Load an image from the specified path and return as a numpy array."""
     with Image.open(image_path) as img:
         return np.array(img)
+
+def degrees_to_radians(degrees):
+    radians = degrees * (np.pi / 180)
+    radians = (radians + np.pi) % (2 * np.pi) - np.pi
+    return radians
+
+def radians_to_degrees(radians):
+    degrees = radians * (180 / np.pi)
+    degrees = (degrees + 360) % 360
+    return degrees
+
+def handle_nan_values(current_values, last_valid_values):
+    """Replace NaN values in the current data array with the last valid values."""
+    if last_valid_values is None:
+        last_valid_values = current_values
+
+    is_nan = np.isnan(current_values)
+    current_values[is_nan] = last_valid_values[is_nan]
+    return current_values
 
 MAX_FRAMES = 58
 
@@ -44,12 +66,27 @@ def create_hdf5_from_json(data, dataset_dir, image_base_dir, task_name):
                 qvel_dataset = obs_group.create_dataset('qvel', (min(len(records), MAX_FRAMES), len(records[0]['joint_angles'])), dtype='f')
                 action_dataset = hdf5_file.create_dataset('action', (min(len(records), MAX_FRAMES), len(records[0]['goal_joints'])), dtype='f')
                 
+                last_valid_qpos = None
+                last_valid_action = None
+
                 for i, record in enumerate(records):
                     if i >= MAX_FRAMES:
                         break
-                    qpos_dataset[i] = record['joint_angles']
-                    qvel_dataset[i] = [0]*len(record['joint_angles'])  # Placeholder if no velocity data
-                    action_dataset[i] = record['goal_joints']
+
+                    current_qpos = np.array(record['joint_angles'], dtype=np.float32)
+                    current_action = np.array(record['goal_joints'], dtype=np.float32)
+
+                    # Handle null values
+                    current_qpos = handle_nan_values(current_qpos, last_valid_qpos)
+                    current_action = handle_nan_values(current_action, last_valid_action)
+
+                    # Update last valid records
+                    last_valid_qpos = current_qpos
+                    last_valid_action = current_action
+
+                    qpos_dataset[i] = degrees_to_radians(current_qpos)
+                    qvel_dataset[i] = np.zeros(len(record['joint_angles']), dtype=np.float32)  # Placeholder if no velocity data
+                    action_dataset[i] = degrees_to_radians(current_action)
                     
                     image_filename = record['image_filename'].split('/')[-1]
                     image_path = os.path.join(image_base_dir, f"task_{episode_id}", image_filename)
@@ -62,42 +99,11 @@ def create_hdf5_from_json(data, dataset_dir, image_base_dir, task_name):
             episode_counter += 1
 
 
-# def get_norm_stats(dataset_dir, episode_ids):
-#     all_qpos_data = []
-#     all_action_data = []
-#     for episode_idx in episode_ids:
-#         dataset_path = os.path.join(dataset_dir, f'episode_{episode_idx}.hdf5')
-#         with h5py.File(dataset_path, 'r') as root:
-#             qpos = root['/observations/qpos'][()]
-#             qvel = root['/observations/qvel'][()]
-#             action = root['/action'][()]
-#         all_qpos_data.append(torch.from_numpy(qpos))
-#         all_action_data.append(torch.from_numpy(action))
-
-#     all_qpos_data = torch.stack(all_qpos_data)
-#     all_action_data = torch.stack(all_action_data)
-#     all_action_data = all_action_data
-
-#     # normalize action data
-#     action_mean = all_action_data.mean(dim=[0, 1], keepdim=True)
-#     action_std = all_action_data.std(dim=[0, 1], keepdim=True)
-#     action_std = torch.clip(action_std, 1e-2, np.inf) # clipping
-
-#     # normalize qpos data
-#     qpos_mean = all_qpos_data.mean(dim=[0, 1], keepdim=True)
-#     qpos_std = all_qpos_data.std(dim=[0, 1], keepdim=True)
-#     qpos_std = torch.clip(qpos_std, 1e-2, np.inf) # clipping
-
-#     stats = {"action_mean": action_mean.numpy().squeeze(), "action_std": action_std.numpy().squeeze(),
-#              "qpos_mean": qpos_mean.numpy().squeeze(), "qpos_std": qpos_std.numpy().squeeze(),
-#              "example_qpos": qpos}
-
-#     return stats
-
-
 # Example usage
-dataset_dir = '/Users/bmiesch/Code/ACT-main/data'
-image_base_dir = '/Users/bmiesch/Code/ACT-main/diagonal/images'
+current_dir = os.path.dirname(os.path.abspath(__file__))
+dataset_dir = os.path.join(current_dir, 'data')
+image_base_dir = os.path.join(os.path.dirname(os.path.dirname(current_dir)), 'data/bowl_data/diagonal/images')
+print(image_base_dir)
 
 # Load JSON data
 with open('data_example.json', 'r') as json_file:
@@ -108,8 +114,10 @@ create_hdf5_from_json(data, dataset_dir, image_base_dir, task_name="diagonal")
 from training.utils import EpisodicDataset
 
 task_name = "diagonal"
+print(dataset_dir)
 task_dir = os.path.join(dataset_dir, task_name)
 camera_names = ["camera1"]  # This should match the name used in the HDF5 file
+print(task_dir)
 norm_stats = get_norm_stats(task_dir, len(os.listdir(task_dir)))
 
 dataset = EpisodicDataset([i for i in range(len(os.listdir(task_dir)))], os.path.join(dataset_dir, task_name), camera_names, norm_stats)

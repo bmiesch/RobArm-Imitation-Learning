@@ -26,11 +26,11 @@ ROBOT_PORTS = {
 TASK_CONFIG = {
     'dataset_dir': DATA_DIR,
     'episode_len': 300,
-    'state_dim': 5,
-    'action_dim': 5,
-    'cam_width': 640,
-    'cam_height': 480,
-    'camera_names': ['front'],
+    'state_dim': 6, # 5
+    'action_dim': 6, # 5
+    'cam_width': 240, # 640
+    'cam_height': 240, # 480
+    'camera_names': ['camera1'],
     'camera_port': 0
 }
 
@@ -39,7 +39,7 @@ TASK_CONFIG = {
 POLICY_CONFIG = {
     'lr': 1e-5,
     'device': device,
-    'num_queries': 100,
+    'num_queries': 58, # 100
     'kl_weight': 10,
     'hidden_dim': 512,
     'dim_feedforward': 3200,
@@ -48,7 +48,7 @@ POLICY_CONFIG = {
     'enc_layers': 4,
     'dec_layers': 7,
     'nheads': 8,
-    'camera_names': ['front'],
+    'camera_names': ['camera1'],
     'policy_class': 'ACT',
     'temporal_agg': False
 }
