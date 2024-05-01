@@ -57,8 +57,8 @@ POLICY_CONFIG = {
 TRAIN_CONFIG = {
     'seed': 42,
     'num_epochs': 2000,
-    'batch_size_val': 8,
-    'batch_size_train': 8,
+    'batch_size_val': 4,
+    'batch_size_train': 4,
     'eval_ckpt_name': 'policy_last.ckpt',
     'checkpoint_dir': CHECKPOINT_DIR
 }
