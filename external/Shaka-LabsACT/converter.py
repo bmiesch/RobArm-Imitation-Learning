@@ -16,14 +16,12 @@ def load_image(image_path):
         return np.array(img)
 
 def degrees_to_radians(degrees):
-    radians = degrees * (np.pi / 180)
-    radians = (radians + np.pi) % (2 * np.pi) - np.pi
-    return radians
+    """Convert degrees to radians without normalization."""
+    return degrees * (np.pi / 180)
 
 def radians_to_degrees(radians):
-    degrees = radians * (180 / np.pi)
-    degrees = (degrees + 360) % 360
-    return degrees
+    """Convert radians to degrees without normalization."""
+    return radians * (180 / np.pi)
 
 def handle_nan_values(current_values, last_valid_values):
     """Replace NaN values in the current data array with the last valid values."""

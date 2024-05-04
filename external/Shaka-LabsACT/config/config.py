@@ -25,7 +25,7 @@ ROBOT_PORTS = {
 # task config (you can add new tasks)
 TASK_CONFIG = {
     'dataset_dir': DATA_DIR,
-    'episode_len': 300,
+    'episode_len': 58, # 300
     'state_dim': 6, # 5
     'action_dim': 6, # 5
     'cam_width': 240, # 640

@@ -26,14 +26,12 @@ train_cfg = TRAIN_CONFIG
 cfg = TASK_CONFIG
 
 def degrees_to_radians(degrees):
-    radians = degrees * (np.pi / 180)
-    radians = (radians + np.pi) % (2 * np.pi) - np.pi
-    return radians
+    """Convert degrees to radians without normalization."""
+    return degrees * (np.pi / 180)
 
 def radians_to_degrees(radians):
-    degrees = radians * (180 / np.pi)
-    degrees = (degrees + 360) % 360
-    return degrees
+    """Convert radians to degrees without normalization."""
+    return radians * (180 / np.pi)
 
 class RobotController:
     def __init__(self, camera_index, checkpoint_path):
@@ -141,28 +139,106 @@ class RobotController:
     def control_loop(self):
         # Set to above block position
         self.robotic_arm.set_custom_position([90, 80, 50, 50, 265, 135])
+            # Initialize buffers for temporal aggregation
+        query_frequency = policy_config['num_queries']
+        if policy_config['temporal_agg']:
+            query_frequency = 1
+            num_queries = policy_config['num_queries']
+        
+        if policy_config['temporal_agg']:
+            all_time_actions = torch.zeros([cfg['episode_len'], cfg['episode_len']+num_queries, cfg['state_dim']]).to(device)
+        # qpos_history = torch.zeros((1, cfg['episode_len'], cfg['state_dim'])).to(device)
 
-        while True:
-            image = self.capture_image()
-            if image is None:
-                continue
-            qpos = self.robotic_arm.read_joint_angles()
-            while any(joint is None for joint in qpos):
-                time.sleep(0.1)
+        with torch.inference_mode():
+            # Main control loop
+            for t in range(cfg['episode_len']):
+                image = self.capture_image()
+                processed_image = {'camera1': self.preprocess_image(image)}
+                image = get_image(processed_image, ['camera1'], self.device)
+
                 qpos = self.robotic_arm.read_joint_angles()
-            qpos_radians = [degrees_to_radians(joint) for joint in qpos]
+                while any(joint is None for joint in qpos):
+                    time.sleep(0.1)
+                    qpos = self.robotic_arm.read_joint_angles()
+                qpos_radians = [degrees_to_radians(joint) for joint in qpos]
+                qpos_numpy = np.array(qpos_radians)
+                qpos = self.pre_process(qpos_numpy)
+                qpos = torch.from_numpy(qpos).float().to(self.device).unsqueeze(0)
 
-            joint_angles = self.predict_joint_angles(image, qpos_radians)
-            print("Joint angles before conversion:", joint_angles)
-            print("Data types of joint angles:", [type(joint) for joint in joint_angles])
-            joint_angles = [radians_to_degrees(joint) for joint in joint_angles]
-            print(joint_angles)
-            
-            # Manual confirmation
-            input("Press Enter to move to the next position, or Ctrl+C to exit...")
-            
-            self.robotic_arm.set_custom_position(joint_angles)
-            time.sleep(0.1)
+
+                # Query the policy
+                if t % query_frequency == 0:
+                    all_actions = self.policy(qpos, image)
+
+                # Handle temporal aggregation
+                if policy_config['temporal_agg']:
+                    all_time_actions[[t], t:t+num_queries] = all_actions
+                    actions_for_curr_step = all_time_actions[:, t]
+                    actions_populated = torch.all(actions_for_curr_step != 0, axis=1)
+                    actions_for_curr_step = actions_for_curr_step[actions_populated]
+                    k = 0.01
+                    exp_weights = np.exp(-k * np.arange(len(actions_for_curr_step)))
+                    exp_weights = exp_weights / exp_weights.sum()
+                    exp_weights = torch.from_numpy(exp_weights.astype(np.float32)).to(device).unsqueeze(dim=1)
+                    raw_action = (actions_for_curr_step * exp_weights).sum(dim=0, keepdim=True)
+                else:
+                    print("index: ", t % query_frequency)
+                    raw_action = all_actions[:, t % query_frequency]
+
+                # Post-process and execute actions
+                raw_action = raw_action.squeeze(0).cpu().numpy()
+                action = self.post_process(raw_action)
+                joint_angles_degrees = [radians_to_degrees(joint) for joint in action]
+                print(joint_angles_degrees)
+
+                # Manual confirmation
+                # input("Press Enter to move to the next position, or Ctrl+C to exit...")
+                
+                self.robotic_arm.set_custom_position(joint_angles_degrees)
+                time.sleep(0.01)
+    
+    def control_loop_continuous(self):
+        # Set to initial position
+        self.robotic_arm.set_custom_position([90, 80, 50, 50, 265, 135])
+
+        # Initialize buffers for temporal aggregation if needed
+        query_frequency = policy_config['num_queries']
+        if policy_config['temporal_agg']:
+            query_frequency = 1
+            num_queries = policy_config['num_queries']
+            all_time_actions = torch.zeros([num_queries, cfg['state_dim']]).to(self.device)
+
+        try:
+            while True:  # Continuous loop
+                with torch.inference_mode():
+                    image = self.capture_image()
+                    processed_image = {'camera1': self.preprocess_image(image)}
+                    image = get_image(processed_image, ['camera1'], self.device)
+
+                    qpos = self.robotic_arm.read_joint_angles()
+                    while any(joint is None for joint in qpos):
+                        time.sleep(0.1)
+                        qpos = self.robotic_arm.read_joint_angles()
+                    qpos_radians = [degrees_to_radians(joint) for joint in qpos]
+                    qpos_numpy = np.array(qpos_radians)
+                    qpos = self.pre_process(qpos_numpy)
+                    qpos = torch.from_numpy(qpos).float().to(self.device).unsqueeze(0)
+
+                    # Query the policy for the next action
+                    raw_action = self.policy(qpos, image)
+
+                    # Post-process and execute actions
+                    action = raw_action[:, 0]
+                    action = action.squeeze(0).cpu().numpy()
+                    action = self.post_process(action)
+                    joint_angles_degrees = [radians_to_degrees(joint) for joint in action]
+                    print(joint_angles_degrees)
+
+                    self.robotic_arm.set_custom_position(joint_angles_degrees)
+                    time.sleep(0.01)  # Small delay to prevent overwhelming the robot controller
+
+        except KeyboardInterrupt:
+            print("Manual interruption received. Stopping the control loop.")
 
 if __name__ == "__main__":
     controller = RobotController(camera_index=1, checkpoint_path="checkpoints/diagonal")
